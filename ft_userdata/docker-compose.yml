@@ -1,0 +1,57 @@
+version: '3'
+
+services:    
+  app1:
+    image: containous/whoami:v1.5.0  
+    container_name: app1
+  ################################################
+  ####        Traefik Proxy Setup           #####
+  ###############################################
+  traefik:
+    image: traefik:v2.5
+    hostname: traefik
+    restart: always
+    container_name: traefik  
+    ports:
+      - "80:80" # <== http
+      - "8080:8080" # <== :8080 is where the dashboard runs on
+      - "443:443" # <== https
+    command:
+      - --api.insecure=true
+      - --api.debug=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=true
+      - --entrypoints.http.address=:80 # <== Defining an entrypoint for port :80 named web
+      - --entrypoints.https.address=:443
+      - --providers.docker.exposedbydefault=true
+      - --providers.docker.defaultRule=Host(`{{index .Labels "com.docker.service"}}.devops`)
+    volumes:
+    - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - traefik.enable=false
+    mem_limit: 50m
+
+  ################################################
+  ####            freqtrade Setup           #####
+  ############################################### 
+  freqtrade:
+    #image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade:develop
+    # Use plotting image
+    #image: freqtradeorg/freqtrade:develop_plot
+    # Build step - only needed when additional dependencies are needed
+    # build:
+    #   context: .
+    #   dockerfile: "./docker/Dockerfile.custom"
+    restart: on-failure
+    container_name: freqtrade
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    #- /etc/timezone:/etc/timezone:ro
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3_freqtrade.sqlite
+      --config /freqtrade/user_data/config_freqtrade.json
+      --strategy mabStra 
+    mem_limit: 300m
